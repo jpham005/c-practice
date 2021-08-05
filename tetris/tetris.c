@@ -1,8 +1,20 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 #include "shape.h"
+#include "input.h"
+//rotate 수정하기
+
+typedef struct _tetrimino {
+    int shape;
+    int rot;
+} tetrimino;
 
 int board[22][17] = {0,};
-int cposX, cposY, x, y, z;
+int shapeArr[7] = {0,};
+int cposX, cposY, cnt = 0;
+tetrimino current;
 
 void render() {
     for (int i = 0; i < 12; i++) {
@@ -16,94 +28,72 @@ void render() {
     }
 }
 
-void moveRight() {
+int checkblock(int x, int y, int shape, int rot) {
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
-            if (board[cposY + i][cposX + 3 - j] == 1 && board[cposY + i][cposX + 4 - j] >= 2) {
-                return;
-            }
-        }
-    }
-
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            if (board[cposY + i][cposX + 3 - j] == 1) {
-                board[cposY + i][cposX + 4 - j] = 1;
-                board[cposY + i][cposX + 3 - j] = 0;
-            }
+            if(tetrimino_shapes[shape][rot][i * 4 + j] == 0)
+                continue;
+                
+            if (board[y + i][x + j] >= 2)
+                return 0;
         }
     }
     
-    cposX += 1;
+    return 1;
 }
 
-void moveLeft() {
+void addblock(int x, int y, int shape, int rot, int diff) {
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
-            if (board[cposY + i][cposX + j] == 1 && board[cposY + i][cposX -1 + j] >= 2) {
-                return;
-            }
+            board[y + i][x + j] += tetrimino_shapes[shape][rot][i * 4 + j] * diff;
         }
-    }
-
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            if (board[cposY + i][cposX + j] == 1) {
-                board[cposY + i][cposX - 1 + j] = 1;
-                board[cposY + i][cposX + j] = 0;
-            }
-        }
-    }
-
-    cposX -= 1;
-}
-
-void moveDown() {
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            if (board[cposY + i][cposX + j] == 1 && board[cposY + 1 + i][cposX + j] >= 2)
-                return;
-        }
-
-              
-    }
-
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            if (board[cposY + 3 - i][cposX + j] == 1) {
-                board[cposY + 4 - i][cposX + j] = 1;
-                board[cposY + 3 - i][cposX + j] = 0;
-            }
-        }  
     }
 }
 
-void rotate(int a, int b) {
-    if (a == 1) {
-        if (b == 3)
-            b = 0;
-        else ++b;
+int nextblock() {
+    if (cnt == 7) {
+        cnt = 0;
+        memset(shapeArr, 0, sizeof(shapeArr));
+    }
+
+    int a = rand() % 7;
+    while (shapeArr[a]) {
+        a = rand() % 7;
+    }
+
+    current.shape = a;
+    current.rot = rand() % 4;
+    cposX = 4;
+    cposY = 1;
+    shapeArr[a]++;
+    cnt++;
+
+    if (checkblock(cposX, cposY, current.shape, current.rot) == 0) {
+        return 0;
+    }
+
+    addblock(cposX, cposY, current.shape, current.rot, 1);
+    return 1;
+}
+
+int move(int dx, int dy, int drot) {
+
+    if (checkblock(cposX + dx, cposY + dy, current.shape, (current.rot + drot) % 4 == 1)){       
+        addblock(cposX, cposY, current.shape, current.rot, -1);
+        cposX += dx;
+        cposY += dy;
+        current.rot = (current.rot + drot) % 4;
+        addblock(cposX, cposY, current.shape, current.rot, 1);
+        return 1;
     } else {
-        if (b == 0)
-            b = 3;
-        else --b;
-    }
-    
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            board[cposY + i][cposX + j] = tetrimino_shapes[1][b][(i * 4)+ j];
-        }
+        return 0;
     }
 }
 
-void finish() {
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            if (board[cposY + i][cposX + j] == 1) {
-                board[cposY + i][cposX + j] = 2;
-            }
-        }
-    }    
+int harddrop() {
+    while (move(0, 1, 0));
+    addblock(cposX, cposY, current.shape, current.rot, 1);
+    return nextblock();
 }
 
 void complete() {
@@ -136,6 +126,8 @@ void complete() {
 }
 
 void print() {
+    printf("\x1b[H");
+
     for (int i = 0; i < 22; i++) {
         for (int j = 0; j < 12; j++) {
             switch (board[i][j]) {
@@ -154,60 +146,48 @@ void print() {
     }
 }
 
-int kbhit() {
-    int ch = getchar();
-
-    if(ch != EOF) {
-        ungetc(ch, stdin);
-        return 1;
-    }
-
-    return 0;
-}
-
 void input() {
     while(1) {       
         if (kbhit() == 0)
-            break;
+            continue;
 
         int ch = getchar();
         switch (ch) {
             case 27:
                 if (getchar() == 91) {
                     int b = getchar();
-                    
-                    if (b == 66) { // d
-                        moveDown();
-                        print();
+                    if (b == 65) {
+                        move(0, 0, 1);                   
+                    } else if (b == 66) { // d
+                        move(0, 1, 0);
                     } else if (b == 67) { // r
-                        moveRight();
-                        print();
+                        move(1, 0, 0);
                     } else if (b == 68) { // left
-                        moveLeft();
-                        print();
+                        move(-1, 0, 0);
                     }
                 }
                 break;
                 
             case 122: // z
-                rotate(-1, 0);
-                print();
+                move(0, 0, 3);
                 break;
         
-            case 99: // c
-                rotate(1, 0);
-                print();
-                break;
+            /*case 99: // c
+            */
             
             case 32:  //space
-                finish();
-                print();
+                if (harddrop() == 0)
+                    exit(0);
                 break;
-        }        
+        }
+
+        print();        
     }
 }
 
 int main() {
+    srand(time(NULL));
+    printf("\x1b[2J");
     render();
     board[1][5] = 1;
     board[1][6] = 1;
@@ -215,6 +195,5 @@ int main() {
     board[1][8] = 1;
     cposX = 5; 
     cposY = 0;
-    moveDown();
-    print();
+    input();
 }
