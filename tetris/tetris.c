@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <sys/time.h>
 #include "shape.h"
 #include "input.h"
-//rotate 수정하기
 
 typedef struct _tetrimino {
     int shape;
@@ -13,8 +13,9 @@ typedef struct _tetrimino {
 
 int board[22][17] = {0,};
 int shapeArr[7] = {0,};
-int cposX, cposY, cnt = 0;
+int cposX, cposY, cnt = 0, swapcnt = 0, swapshape, swaprot;
 tetrimino current;
+struct timeval startTime; 
 
 void render() {
     for (int i = 0; i < 12; i++) {
@@ -33,7 +34,7 @@ int checkblock(int x, int y, int shape, int rot) {
         for (int j = 0; j < 4; j++) {
             if(tetrimino_shapes[shape][rot][i * 4 + j] == 0)
                 continue;
-                
+
             if (board[y + i][x + j] >= 2)
                 return 0;
         }
@@ -51,6 +52,7 @@ void addblock(int x, int y, int shape, int rot, int diff) {
 }
 
 int nextblock() {
+    
     if (cnt == 7) {
         cnt = 0;
         memset(shapeArr, 0, sizeof(shapeArr));
@@ -78,7 +80,7 @@ int nextblock() {
 
 int move(int dx, int dy, int drot) {
 
-    if (checkblock(cposX + dx, cposY + dy, current.shape, (current.rot + drot) % 4 == 1)){       
+    if (checkblock(cposX + dx, cposY + dy, current.shape, (current.rot + drot) % 4) == 1){       
         addblock(cposX, cposY, current.shape, current.rot, -1);
         cposX += dx;
         cposY += dy;
@@ -88,12 +90,6 @@ int move(int dx, int dy, int drot) {
     } else {
         return 0;
     }
-}
-
-int harddrop() {
-    while (move(0, 1, 0));
-    addblock(cposX, cposY, current.shape, current.rot, 1);
-    return nextblock();
 }
 
 void complete() {
@@ -125,18 +121,52 @@ void complete() {
     }
 }
 
+int harddrop() {
+    while (move(0, 1, 0));
+    addblock(cposX, cposY, current.shape, current.rot, 1);
+    complete();
+    return nextblock();
+}
+
+int swap (int x, int y, int shape, int rot) {
+    int tempa, tempb;
+
+    if (swapcnt == 0) {
+        addblock(x, y, shape, rot, -1);
+        addblock(13, 1, shape, rot, 1);
+        swapshape = shape;
+        swaprot = rot;
+        swapcnt++;
+        return nextblock();
+    } else {
+        addblock(13, 1, swapshape, swaprot, -1);
+        addblock(x, y, shape, rot, -1);
+        addblock(4, 1, swapshape, swaprot, 1);
+        addblock(13, 1, shape, rot, 1);
+        tempa = swapshape;
+        tempb = swaprot;
+        swapshape = shape;
+        swaprot = rot;
+        cposX = 4;
+        cposY = 1;
+        current.shape = tempa;
+        current.rot = tempb;
+        return 1;
+    }
+}
+
 void print() {
     printf("\x1b[H");
 
     for (int i = 0; i < 22; i++) {
-        for (int j = 0; j < 12; j++) {
+        for (int j = 0; j < 17; j++) {
             switch (board[i][j]) {
                 case 0:
                     printf(" ");
                     break;
                 case 1:
                 case 2:
-                    printf("▢");
+                    printf("@");
                     break;
                 case 3:
                     printf("■");
@@ -146,10 +176,34 @@ void print() {
     }
 }
 
+void timer() {
+    struct timeval endTime;
+    long long diffTime;
+
+    gettimeofday(&endTime, NULL);
+    diffTime = ( endTime.tv_sec - startTime.tv_sec ) * 1000000 + (endTime.tv_usec - startTime.tv_usec);
+
+    if (diffTime > 1000000) {
+        gettimeofday(&startTime, NULL);
+        if (move(0, 1, 0) == 0) {
+            addblock(cposX, cposY, current.shape, current.rot, 1);
+            complete();
+
+            if (nextblock() == 0) {
+                print();
+                exit(0);
+            }
+        }
+        print();
+    } 
+}
+
 void input() {
     while(1) {       
-        if (kbhit() == 0)
+        if (kbhit() == 0) {
+            timer();
             continue;
+        }
 
         int ch = getchar();
         switch (ch) {
@@ -160,6 +214,7 @@ void input() {
                         move(0, 0, 1);                   
                     } else if (b == 66) { // d
                         move(0, 1, 0);
+                        gettimeofday(&startTime, NULL);
                     } else if (b == 67) { // r
                         move(1, 0, 0);
                     } else if (b == 68) { // left
@@ -172,12 +227,20 @@ void input() {
                 move(0, 0, 3);
                 break;
         
-            /*case 99: // c
-            */
-            
-            case 32:  //space
-                if (harddrop() == 0)
+            case 99: // c
+                if (swap(cposX, cposY, current.shape, current.rot) == 0) {
+                    print();
                     exit(0);
+                }
+                break;
+                    
+            case 32:  //space
+                gettimeofday(&startTime, NULL);
+
+                if (harddrop() == 0) {
+                    print();
+                    exit(0);
+                }
                 break;
         }
 
@@ -187,13 +250,11 @@ void input() {
 
 int main() {
     srand(time(NULL));
+    gettimeofday(&startTime, NULL);
+    PrepareKbhit();
     printf("\x1b[2J");
+    nextblock();
     render();
-    board[1][5] = 1;
-    board[1][6] = 1;
-    board[1][7] = 1;
-    board[1][8] = 1;
-    cposX = 5; 
-    cposY = 0;
+    print();
     input();
 }
