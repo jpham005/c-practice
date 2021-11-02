@@ -37,6 +37,9 @@ int main() {
 
     qsort(arr, n, sizeof(char*), compare);
 
-    for (int i = 0; i < n; i++)
+    for (int i = 0; i < n; i++) {
+        if (i > 0 && strcmp(arr[i], arr[i - 1]) == 0)
+            continue;    
         printf("%s\n", arr[i]);
+    }
 }
