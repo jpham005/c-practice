@@ -13,8 +13,8 @@ int compareGroup(int *g1, int *g2, int n) {
 
     for (int i = 0; i < n / 2; i++) {
         for (int j = 0; j < n / 2; j++) {
-            n1 += stat[g1[i] - 1][g1[j] - 1];
-            n2 += stat[g2[i] - 1][g2[j] - 1];
+            n1 += stat[g1[i]][g1[j]];
+            n2 += stat[g2[i]][g2[j]];
         }
     }
 
@@ -23,7 +23,7 @@ int compareGroup(int *g1, int *g2, int n) {
 
 void makeGroup(int start, int pos, int n) {
     if (pos == n / 2) {
-        for (int i = 0, j = 1; j < n + 1; j++) {
+        for (int i = 0, j = 0; j < n; j++) {
             if (flag[j] == 0) {
                 g2[i] = j;
                 i++;
@@ -37,7 +37,7 @@ void makeGroup(int start, int pos, int n) {
         return;
     }
 
-    for (int i = start; i < 7; i++) {
+    for (int i = start; i < 6; i++) {
         g1[pos] = i;
         flag[i] = 1;
         makeGroup(i + 1, pos + 1, n);
@@ -58,7 +58,7 @@ int main() {
     memset(flag, 0, sizeof(int) * 21);
     result = 2000000000;
 
-    makeGroup(1, 0, n);
+    makeGroup(0, 0, n);
 
     printf("%d\n", result);
 }
